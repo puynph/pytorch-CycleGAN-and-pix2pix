@@ -24,11 +24,39 @@ from data import create_dataset
 from models import create_model
 from util.visualizer import Visualizer
 
+def validate(model, val_dataset):
+    """Evaluate the model on the validation dataset and return the validation losses."""
+    model.eval()  # Set the model to evaluation mode
+    val_losses = {'D_A': 0, 'G_A': 0, 'cycle_A': 0, 'idt_A': 0, 
+                  'D_B': 0, 'G_B': 0, 'cycle_B': 0, 'idt_B': 0}
+    num_batches = 0
+
+    for i, data in enumerate(val_dataset):
+        model.set_input(data)  
+        model.forward()        
+
+        # Accumulate validation losses
+        losses = model.get_current_losses()
+        for key in val_losses:
+            val_losses[key] += losses[key]
+        num_batches += 1
+
+    # Average the losses over all validation batches
+    print(num_batches)
+    for key in val_losses:
+        val_losses[key] /= num_batches
+    return val_losses
+
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
     dataset_size = len(dataset)    # get the number of images in the dataset.
+    val_opt = TrainOptions().parse()    
+    val_opt.phase = 'val'          
+    val_dataset = create_dataset(val_opt)  # create a validation dataset
+    val_size = len(val_dataset)    # get the number of images in the validation dataset.
     print('The number of training images = %d' % dataset_size)
+    print('The number of validation images = %d' % val_size)
 
     model = create_model(opt)      # create a model given opt.model and other options
     model.setup(opt)               # regular setup: load and print networks; create schedulers
@@ -73,5 +101,11 @@ if __name__ == '__main__':
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks('latest')
             model.save_networks(epoch)
+
+        if epoch % 10 == 0:
+            val_losses = validate(model, val_dataset)
+            print('Validation losses: ')
+            visualizer.print_current_losses(epoch, total_iters, val_losses, t_comp=0, t_data=0)
+            visualizer.plot_current_losses(epoch, float(total_iters) / len(val_dataset), val_losses)
 
         print('End of epoch %d / %d \t Time Taken: %d sec' % (epoch, opt.n_epochs + opt.n_epochs_decay, time.time() - epoch_start_time))
