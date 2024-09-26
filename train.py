@@ -24,28 +24,23 @@ from data import create_dataset
 from models import create_model
 from util.visualizer import Visualizer
 
-def validate(model, val_dataset):
+def validate(model, val_dataset, epoch, valtotal_iters):
     """Evaluate the model on the validation dataset and return the validation losses."""
     model.eval()  # Set the model to evaluation mode
-    val_losses = {'D_A': 0, 'G_A': 0, 'cycle_A': 0, 'idt_A': 0, 
-                  'D_B': 0, 'G_B': 0, 'cycle_B': 0, 'idt_B': 0}
-    num_batches = 0
-
+    epoch_iter = 0
     for i, data in enumerate(val_dataset):
         model.set_input(data)  
-        model.forward()        
+        model.validate_parameters()
+        epoch_iter += 1
+        valtotal_iters += 1
 
-        # Accumulate validation losses
-        losses = model.get_current_losses()
-        for key in val_losses:
-            val_losses[key] += losses[key]
-        num_batches += 1
+        if valtotal_iters % 868 == 0: 
+            print("Validation losses: ")
+            losses = model.get_current_losses()
+            visualizer.print_current_losses(epoch, valtotal_iters, losses, t_comp=0, t_data=0)
+            save_suffix = f"{valtotal_iters}"
+            model.save_networks(epoch)
 
-    # Average the losses over all validation batches
-    print(num_batches)
-    for key in val_losses:
-        val_losses[key] /= num_batches
-    return val_losses
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
@@ -62,7 +57,7 @@ if __name__ == '__main__':
     model.setup(opt)               # regular setup: load and print networks; create schedulers
     visualizer = Visualizer(opt)   # create a visualizer that display/save images and plots
     total_iters = 0                # the total number of training iterations
-
+    valtotal_iters = 0 
     for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):    # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
         epoch_start_time = time.time()  # timer for entire epoch
         iter_data_time = time.time()    # timer for data loading per iteration
@@ -91,21 +86,18 @@ if __name__ == '__main__':
                 if opt.display_id > 0:
                     visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, losses)
 
-            if total_iters % opt.save_latest_freq == 0:   # cache our latest model every <save_latest_freq> iterations
-                print('saving the latest model (epoch %d, total_iters %d)' % (epoch, total_iters))
-                save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
-                model.save_networks(save_suffix)
+        #     if total_iters % opt.save_latest_freq == 0:   # cache our latest model every <save_latest_freq> iterations
+        #         print('saving the latest model (epoch %d, total_iters %d)' % (epoch, total_iters))
+        #         save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
+        #         model.save_networks(save_suffix)
 
             iter_data_time = time.time()
-        if epoch % opt.save_epoch_freq == 0:              # cache our model every <save_epoch_freq> epochs
-            print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
-            model.save_networks('latest')
-            model.save_networks(epoch)
+        # if epoch % opt.save_epoch_freq == 0:              # cache our model every <save_epoch_freq> epochs
+        #     print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
+        #     model.save_networks('latest')
+        #     model.save_networks(epoch)
 
         if epoch % 10 == 0:
-            val_losses = validate(model, val_dataset)
-            print('Validation losses: ')
-            visualizer.print_current_losses(epoch, total_iters, val_losses, t_comp=0, t_data=0)
-            visualizer.plot_current_losses(epoch, float(total_iters) / len(val_dataset), val_losses)
+            validate(model, val_dataset, epoch, valtotal_iters)
 
         print('End of epoch %d / %d \t Time Taken: %d sec' % (epoch, opt.n_epochs + opt.n_epochs_decay, time.time() - epoch_start_time))

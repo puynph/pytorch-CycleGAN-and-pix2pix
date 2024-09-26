@@ -192,3 +192,14 @@ class CycleGANModel(BaseModel):
         self.backward_D_A()      # calculate gradients for D_A
         self.backward_D_B()      # calculate graidents for D_B
         self.optimizer_D.step()  # update D_A and D_B's weights
+
+    def validate_parameters(self):
+        """Calculate losses without gradient for validation"""
+        # forward
+        self.forward()      
+        # G_A and G_B
+        self.backward_G()             # calculate losses for G_A and G_B
+
+        # D_A and D_B
+        self.backward_D_A()      # calculate losses for D_A
+        self.backward_D_B()      # calculate losses for D_B     
