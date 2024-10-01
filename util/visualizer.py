@@ -51,6 +51,24 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256, use_w
     if use_wandb:
         wandb.log(ims_dict)
 
+def save_generated_images(output_folder, visuals, image_path, aspect_ratio=1.0, width=256, use_wandb=False):
+    """Save only fake_B images to a specified folder.
+
+    Parameters:
+        visuals (OrderedDict)    -- an ordered dictionary that stores (name, images (either tensor or numpy) ) pairs
+        image_path (str)         -- the string is used to create image paths
+        output_folder (str)      -- the folder where images will be saved
+        aspect_ratio (float)     -- the aspect ratio of saved images
+    """
+
+    short_path = ntpath.basename(image_path[0])
+    name = os.path.splitext(short_path)[0]
+
+    im_data = visuals['fake_B']
+    im = util.tensor2im(im_data)
+    image_name = '%s.jpg' % name
+    save_path = os.path.join(output_folder, image_name)
+    util.save_image(im, save_path, aspect_ratio=aspect_ratio)
 
 class Visualizer():
     """This class includes several functions that can display/save images and print/save logging information.
